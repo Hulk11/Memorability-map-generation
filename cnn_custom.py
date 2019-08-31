@@ -1,5 +1,5 @@
 """
-	In this file we define a custom CNN model without using fine tuning.
+	In this file we define a custom CNN model without using transfer learning technique.
 
 """
 
@@ -43,14 +43,18 @@ with open("train_1.txt") as f:
 	content = f.readlines()
 print len(content)
 
+
+# Image constants
 IMAGE_WIDTH  = 256
 IMAGE_HEIGHT = 256
+
+# Data Constants defining train-test split 
 train_start  = 1
 train_end    = 43001
 val_end      = 47550
 
 
-# generator that returns the training data
+# Batch image generator that returns the training data in batches
 def gen(batch_size=1, flag='train'):
 	if flag=='train':
 		start = train_start/batch_size
@@ -82,9 +86,8 @@ def gen(batch_size=1, flag='train'):
 			yield x_train, y_train
 
 
-# building a new CNN without fine tuning
+# Designing a new CNN model from scratch
 def baseline_model():
-
 	my_model = Sequential()
 	
 	# Convolution layers		
@@ -108,11 +111,11 @@ def baseline_model():
 	my_model.add(Conv2D(32, (3, 3), activation='relu'))
 	my_model.add(MaxPooling2D(pool_size=(2, 2)))
 
-	# defining dropouts and flatten layer	
+	# Dropout and Flatten layer	
 	my_model.add(Dropout(0.2))
 	my_model.add(Flatten())
 
-	# adding fully connected layers
+	# Fully Connected layers
 	my_model.add(Dense(128, activation='relu'))
 	my_model.add(Dropout(0.2))
 	my_model.add(Dense(64, activation='relu'))
@@ -125,7 +128,7 @@ def baseline_model():
 	return my_model
 
 
-# initiate the above model
+# Initiate base model
 model = baseline_model()
 
 
@@ -134,7 +137,7 @@ batch_size = 16
 EPOCHS = 100
 
 
-#callback to save the epoch with least val_loss
+# Callback function to save the epoch with least val_loss
 filepath       = "weights.best.hdf5"
 checkpoint     = ModelCheckpoint(filepath, monitor='val_acc', verbose=0, save_best_only=True, mode='max')
 
@@ -142,12 +145,10 @@ checkpoint     = ModelCheckpoint(filepath, monitor='val_acc', verbose=0, save_be
 # finally, fit the model to data
 model.fit_generator( gen(batch_size=batch_size),
 					 steps_per_epoch = (train_end - train_start)/batch_size,
-					 # steps_per_epoch = 10,
 					 epochs = EPOCHS,
 					 callbacks = [checkpoint],
 					 validation_data = gen(batch_size=batch_size, flag='val'),
 					 validation_steps = (val_end - train_end)/batch_size
-					 # validation_steps = 2
 					 )
 
-model.save('lamem_trained_new_callback_augmented2_rough.h5')
+model.save('lamem_trained_callback_augmented.h5')
