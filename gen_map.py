@@ -1,5 +1,4 @@
 import numpy as np
-import scipy
 import keras
 from keras.models import Sequential
 from keras.applications.vgg16 import VGG16
@@ -19,43 +18,42 @@ from keras.layers.core import Flatten, Dense, Dropout
 from keras.layers.convolutional import Convolution2D, MaxPooling2D, ZeroPadding2D
 from keras.optimizers import SGD
 from keras.models import load_model
-import scipy.misc
 from keras.preprocessing import image
 from keras.applications.imagenet_utils import preprocess_input
 import h5py
-
+import imageio
 
 # Load the latest saved model (model_name.h5)
 model = load_model('model_name.h5')
 
-xtl=[]
+xtl = []
 
 # path of the image
 path = "codes_GRBM/codes_GRBM/target_images/3.jpg"
-img = image.load_img(path)
-img = image.img_to_array(img)
+img = keras.utils.load_img(path)
+img = keras.utils.img_to_array(img)
 
 # CONSTANTS
-imagewidth  = 256
+imagewidth = 256
 imageheight = 256
-windowsize  = 32
-stride      = 2
+windowsize = 32
+stride = 2
 
-# iterations 
-iterations_w = (imagewidth - windowsize)/stride  +  1 
-iterations_h = (imageheight - windowsize)/stride  +  1 
- 
+# iterations
+iterations_w = (imagewidth - windowsize)/stride + 1
+iterations_h = (imageheight - windowsize)/stride + 1
 
-####### SCORES ARRAY INSTEAD OF THIS 
+
+# SCORES ARRAY INSTEAD OF THIS
 score = np.random.uniform(low=0, high=1, size=(iterations_h*iterations_w,))
 
 # scores' data
-lowest_score  = np.amin(score)
+lowest_score = np.amin(score)
 highest_score = np.amax(score)
-step_size     = (highest_score - lowest_score)/5
+step_size = (highest_score - lowest_score)/5
 
-# image for heatmap 
-newim = np.zeros((3,256,256),dtype='float32')
+# image for heatmap
+newim = np.zeros((3, 256, 256), dtype='float32')
 
 # intensity control factor (to change contrast)
 icf = 20
@@ -63,9 +61,10 @@ icf = 20
 # increment counter
 l = 0
 
+
 def rgb(value):
     # minimum, maximum = lowest_score, highest_score
-    ratio = 2 * (value- lowest_score) / (highest_score - lowest_score)
+    ratio = 2 * (value - lowest_score) / (highest_score - lowest_score)
     b = int(max(0, 255*(1 - ratio)))
     r = int(max(0, 255*(ratio - 1)))
     g = 255 - b - r
@@ -81,8 +80,9 @@ EPSILON = (highest_score - lowest_score)/5
 
 
 # processing image data
-def rgb( val):
-    fi = float(val- lowest_score) / float(highest_score- lowest_score) * (len(colors)-1)
+def rgb(val):
+    fi = float(val - lowest_score) / \
+        float(highest_score - lowest_score) * (len(colors)-1)
     i = int(fi)
     f = fi - i
     if f < EPSILON:
@@ -92,48 +92,62 @@ def rgb( val):
         return int(r1 + f*(r2-r1)), int(g1 + f*(g2-g1)), int(b1 + f*(b2-b1))
 
 
-
 """ 
 		Color coding scheme
 		Pixel intensity is set according to the memorability score of a window stride
 
 """
-for i in range(iterations_w):
-	for j in range(iterations_h):
-		# (r,g,b)
-		a = rgb(score[l])
+for i in range(int(iterations_w)):
+    for j in range(int(iterations_h)):
+        # (r,g,b)
+        a = rgb(score[l])
 
-		# defining intervals for color coding
-		if(score[l]>=lowest_score and score[l]<lowest_score+step_size):
-			newim[0][(j*stride):(j*stride)+windowsize,(i*stride):(i*stride)+windowsize] = a[0]
-			newim[1][(j*stride):(j*stride)+windowsize,(i*stride):(i*stride)+windowsize] = a[1]
-			newim[2][(j*stride):(j*stride)+windowsize,(i*stride):(i*stride)+windowsize] = a[2]#(score[l] - lowest_score)*icf
+        # defining intervals for color coding
+        if(score[l] >= lowest_score and score[l] < lowest_score+step_size):
+            newim[0][(j*stride):(j*stride)+windowsize,
+                     (i*stride):(i*stride)+windowsize] = a[0]
+            newim[1][(j*stride):(j*stride)+windowsize,
+                     (i*stride):(i*stride)+windowsize] = a[1]
+            newim[2][(j*stride):(j*stride)+windowsize, (i*stride):(i *
+                                                                   stride)+windowsize] = a[2]  # (score[l] - lowest_score)*icf
 
-		elif(score[l]>=lowest_score+step_size and score[l]<lowest_score+2*step_size):
-			newim[0][(j*stride):(j*stride)+windowsize,(i*stride):(i*stride)+windowsize] = 0
-			newim[1][(j*stride):(j*stride)+windowsize,(i*stride):(i*stride)+windowsize] = (score[l] - lowest_score)*icf
-			newim[2][(j*stride):(j*stride)+windowsize,(i*stride):(i*stride)+windowsize] = 1
-	
-		elif(score[l]>=lowest_score+2*step_size and score[l]<lowest_score+3*step_size):
-			newim[0][(j*stride):(j*stride)+windowsize,(i*stride):(i*stride)+windowsize] = 0
-			newim[1][(j*stride):(j*stride)+windowsize,(i*stride):(i*stride)+windowsize] = 1
-			newim[2][(j*stride):(j*stride)+windowsize,(i*stride):(i*stride)+windowsize] = (highest_score - score[l])*icf
+        elif(score[l] >= lowest_score+step_size and score[l] < lowest_score+2*step_size):
+            newim[0][(j*stride):(j*stride)+windowsize,
+                     (i*stride):(i*stride)+windowsize] = 0
+            newim[1][(j*stride):(j*stride)+windowsize, (i*stride)
+                      :(i*stride)+windowsize] = (score[l] - lowest_score)*icf
+            newim[2][(j*stride):(j*stride)+windowsize,
+                     (i*stride):(i*stride)+windowsize] = 1
 
-		elif(score[l]>=lowest_score+3*step_size and score[l]<lowest_score+4*step_size):
-			newim[0][(j*stride):(j*stride)+windowsize,(i*stride):(i*stride)+windowsize] = (score[l] - lowest_score)*icf
-			newim[1][(j*stride):(j*stride)+windowsize,(i*stride):(i*stride)+windowsize] = 1
-			newim[2][(j*stride):(j*stride)+windowsize,(i*stride):(i*stride)+windowsize] = 0
-	
-		else:
-			# if(score[l]>=lowest_score+4*step_size and score[l]<=lowest_score+5*step_size)
-			newim[0][(j*stride):(j*stride)+windowsize,(i*stride):(i*stride)+windowsize] = 1
-			newim[1][(j*stride):(j*stride)+windowsize,(i*stride):(i*stride)+windowsize] = (highest_score - score[l])*icf
-			newim[2][(j*stride):(j*stride)+windowsize,(i*stride):(i*stride)+windowsize] = 0
-		l+=1	
+        elif(score[l] >= lowest_score+2*step_size and score[l] < lowest_score+3*step_size):
+            newim[0][(j*stride):(j*stride)+windowsize,
+                     (i*stride):(i*stride)+windowsize] = 0
+            newim[1][(j*stride):(j*stride)+windowsize,
+                     (i*stride):(i*stride)+windowsize] = 1
+            newim[2][(j*stride):(j*stride)+windowsize, (i*stride)
+                      :(i*stride)+windowsize] = (highest_score - score[l])*icf
+
+        elif(score[l] >= lowest_score+3*step_size and score[l] < lowest_score+4*step_size):
+            newim[0][(j*stride):(j*stride)+windowsize, (i*stride)
+                      :(i*stride)+windowsize] = (score[l] - lowest_score)*icf
+            newim[1][(j*stride):(j*stride)+windowsize,
+                     (i*stride):(i*stride)+windowsize] = 1
+            newim[2][(j*stride):(j*stride)+windowsize,
+                     (i*stride):(i*stride)+windowsize] = 0
+
+        else:
+            # if(score[l]>=lowest_score+4*step_size and score[l]<=lowest_score+5*step_size)
+            newim[0][(j*stride):(j*stride)+windowsize,
+                     (i*stride):(i*stride)+windowsize] = 1
+            newim[1][(j*stride):(j*stride)+windowsize, (i*stride)
+                      :(i*stride)+windowsize] = (highest_score - score[l])*icf
+            newim[2][(j*stride):(j*stride)+windowsize,
+                     (i*stride):(i*stride)+windowsize] = 0
+        l += 1
 
 
-# changing dimension to display image 
-newim = np.rollaxis(newim,0,3)
+# changing dimension to display image
+newim = np.rollaxis(newim, 0, 3)
 
 
 """
@@ -141,11 +155,12 @@ newim = np.rollaxis(newim,0,3)
 	    'outfile.jpg' is the name of map image
 
 """
-scipy.misc.imsave('outfile.jpg', newim)
+# scipy.misc.imsave('outfile.jpg', newim) // deprecated
+imageio.imwrite('outfile.jpg', newim)
 
 # Load the image and the image map
-img_map = image.load_img('outfile.jpg')
-orig_image = image.load_img(path)
+img_map = keras.utils.load_img('outfile.jpg')
+orig_image = keras.utils.load_img(path)
 
 # display the image
 plt.imshow(Image.blend(orig_image, img_map, alpha=.9))
