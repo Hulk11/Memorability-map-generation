@@ -28,104 +28,111 @@ from keras.callbacks import ModelCheckpoint
 from keras.preprocessing import image
 from keras.applications.imagenet_utils import preprocess_input
 import tensorflow as tf
+from matplotlib.pyplot import figure
+
 sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
 
+
 def name_image(name="1"):
-	if len(name)>8:
-		return name
-	else:
-		for i in range(8-len(name)):
-			name = "0" + name
-		return name
+    if len(name) > 8:
+        return name
+    else:
+        for i in range(8-len(name)):
+            name = "0" + name
+        return name
 
 
 with open("train_1.txt") as f:
-	content = f.readlines()
-print len(content)
+    content = f.readlines()
+print(len(content))
 
 
 # Image constants
-IMAGE_WIDTH  = 256
+IMAGE_WIDTH = 256
 IMAGE_HEIGHT = 256
 
-# Data Constants defining train-test split 
-train_start  = 1
-train_end    = 43001
-val_end      = 47550
+# Data Constants defining train-test split
+train_start = 1
+train_end = 43001
+val_end = 47550
 
 
 # Batch image generator that returns the training data in batches
 def gen(batch_size=1, flag='train'):
-	if flag=='train':
-		start = train_start/batch_size
-		end   = train_end/batch_size
-	else:
-		start = train_end/batch_size
-		end   = val_end/batch_size
-	x_train = np.zeros((batch_size, IMAGE_WIDTH,IMAGE_HEIGHT,3), dtype='float32')
-	y_train = np.zeros((batch_size, 1), dtype='float32')
-	
-	while True:
-		for i in range(start, end):
-			for j in range(batch_size):
-				if(len(content[i])>23):
-					y_train[j,:] = float(content[i*batch_size+j][content[i*batch_size+j].find(" ")+1:])
-					path = "pre/"+content[i*batch_size+j][:content[i*batch_size+j].find(" ")]
-				else:
-					y_train[j,:] = float(content[i*batch_size+j][13:])
-					path = "lamem/images/"+content[i*batch_size+j][:12]					
+    if flag == 'train':
+        start = train_start/batch_size
+        end = train_end/batch_size
+    else:
+        start = train_end/batch_size
+        end = val_end/batch_size
+    x_train = np.zeros(
+        (batch_size, IMAGE_WIDTH, IMAGE_HEIGHT, 3), dtype='float32')
+    y_train = np.zeros((batch_size, 1), dtype='float32')
 
-				# preprocess the image
-				img = image.load_img(path)
-				img = img.resize((IMAGE_WIDTH,IMAGE_HEIGHT))
-				img = image.img_to_array(img)
-				img = preprocess_input(img, mode='tf')
-				x_train[j, :img.shape[0], :img.shape[1], :] = img
-			
-			# return train data
-			yield x_train, y_train
+    while True:
+        for i in range(start, end):
+            for j in range(batch_size):
+                if(len(content[i]) > 23):
+                    y_train[j, :] = float(
+                        content[i*batch_size+j][content[i*batch_size+j].find(" ")+1:])
+                    path = "pre/"+content[i*batch_size +
+                                          j][:content[i*batch_size+j].find(" ")]
+                else:
+                    y_train[j, :] = float(content[i*batch_size+j][13:])
+                    path = "lamem/images/"+content[i*batch_size+j][:12]
+
+                # preprocess the image
+                img = keras.utils.load_img(path)
+                img = img.resize((IMAGE_WIDTH, IMAGE_HEIGHT))
+                img = keras.utils.img_to_array(img)
+                img = preprocess_input(img, mode='tf')
+                x_train[j, :img.shape[0], :img.shape[1], :] = img
+
+            # return train data
+            yield x_train, y_train
 
 
 # Designing a new CNN model from scratch
 def baseline_model():
-	my_model = Sequential()
-	
-	# Convolution layers		
-	my_model.add(Conv2D(32, (3, 3), input_shape=(IMAGE_WIDTH,IMAGE_HEIGHT,3), activation='relu'))
-	my_model.add(Conv2D(32, (3, 3), activation='relu'))
-	my_model.add(MaxPooling2D(pool_size=(2, 2)))
-	
-	my_model.add(Conv2D(64, (3, 3), activation='relu'))
-	my_model.add(Conv2D(64, (3, 3), activation='relu'))
-	my_model.add(MaxPooling2D(pool_size=(2, 2)))
+    my_model = Sequential()
 
-	my_model.add(Conv2D(64, (3, 3), activation='relu'))
-	my_model.add(Conv2D(64, (3, 3), activation='relu'))
-	my_model.add(MaxPooling2D(pool_size=(2, 2)))
+    # Convolution layers
+    my_model.add(Conv2D(32, (3, 3), input_shape=(
+        IMAGE_WIDTH, IMAGE_HEIGHT, 3), activation='relu'))
+    my_model.add(Conv2D(32, (3, 3), activation='relu'))
+    my_model.add(MaxPooling2D(pool_size=(2, 2)))
 
-	my_model.add(Conv2D(64, (3, 3), activation='relu'))
-	my_model.add(Conv2D(64, (3, 3), activation='relu'))
-	my_model.add(MaxPooling2D(pool_size=(2, 2)))
-	
-	my_model.add(Conv2D(32, (3, 3), activation='relu'))
-	my_model.add(Conv2D(32, (3, 3), activation='relu'))
-	my_model.add(MaxPooling2D(pool_size=(2, 2)))
+    my_model.add(Conv2D(64, (3, 3), activation='relu'))
+    my_model.add(Conv2D(64, (3, 3), activation='relu'))
+    my_model.add(MaxPooling2D(pool_size=(2, 2)))
 
-	# Dropout and Flatten layer	
-	my_model.add(Dropout(0.2))
-	my_model.add(Flatten())
+    my_model.add(Conv2D(64, (3, 3), activation='relu'))
+    my_model.add(Conv2D(64, (3, 3), activation='relu'))
+    my_model.add(MaxPooling2D(pool_size=(2, 2)))
 
-	# Fully Connected layers
-	my_model.add(Dense(128, activation='relu'))
-	my_model.add(Dropout(0.2))
-	my_model.add(Dense(64, activation='relu'))
-	my_model.add(Dense(1, activation='sigmoid'))
-	my_model.summary()
+    my_model.add(Conv2D(64, (3, 3), activation='relu'))
+    my_model.add(Conv2D(64, (3, 3), activation='relu'))
+    my_model.add(MaxPooling2D(pool_size=(2, 2)))
 
-	# Compile model
-	my_model.compile(loss='mean_squared_error', optimizer='sgd')
+    my_model.add(Conv2D(32, (3, 3), activation='relu'))
+    my_model.add(Conv2D(32, (3, 3), activation='relu'))
+    my_model.add(MaxPooling2D(pool_size=(2, 2)))
 
-	return my_model
+    # Dropout and Flatten layer
+    my_model.add(Dropout(0.2))
+    my_model.add(Flatten())
+
+    # Fully Connected layers
+    my_model.add(Dense(128, activation='relu'))
+    my_model.add(Dropout(0.2))
+    my_model.add(Dense(64, activation='relu'))
+    my_model.add(Dense(1, activation='sigmoid'))
+    my_model.summary()
+
+    # Compile model
+    my_model.compile(loss='mean_squared_error', optimizer='sgd')
+
+    return my_model
 
 
 # Initiate base model
@@ -138,17 +145,28 @@ EPOCHS = 100
 
 
 # Callback function to save the epoch with least val_loss
-filepath       = "weights.best.hdf5"
-checkpoint     = ModelCheckpoint(filepath, monitor='val_acc', verbose=0, save_best_only=True, mode='max')
+filepath = "weights.best.hdf5"
+checkpoint = ModelCheckpoint(
+    filepath, monitor='val_acc', verbose=0, save_best_only=True, mode='max')
 
 
 # finally, fit the model to data
-model.fit_generator( gen(batch_size=batch_size),
-					 steps_per_epoch = (train_end - train_start)/batch_size,
-					 epochs = EPOCHS,
-					 callbacks = [checkpoint],
-					 validation_data = gen(batch_size=batch_size, flag='val'),
-					 validation_steps = (val_end - train_end)/batch_size
-					 )
+history = model.fit(gen(batch_size=batch_size),
+                    steps_per_epoch=(train_end - train_start)/batch_size,
+                    epochs=EPOCHS,
+                    callbacks=[checkpoint],
+                    validation_data=gen(batch_size=batch_size, flag='val'),
+                    validation_steps=(val_end - train_end)/batch_size
+                    )
 
 model.save('lamem_trained_callback_augmented.h5')
+
+figure(figsize=(8, 6))
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
+plt.title('model loss')
+plt.ylabel('loss')
+plt.xlabel('epoch')
+plt.legend(['train', 'test'], loc='upper left')
+plt.savefig('plot.png')
+plt.show()
